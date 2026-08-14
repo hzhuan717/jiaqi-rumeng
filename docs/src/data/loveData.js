@@ -121,18 +121,6 @@ export const loveData = {
     },
     {
       chapter: "第七章",
-      title: "记忆小屋",
-      kind: "games",
-      paragraphs: [
-        "我这个人记性一般，背过的书考完就忘。",
-        "唯独关于你的事，我过目不忘：你爱吃的、怕冷的、笑起来眼睛先弯的样子。",
-        "所以我在书里盖了一间记忆小屋。翻牌、接爱心、戳泡泡——都是些小游戏，但我想把和你有关的一切，都练成肌肉记忆。",
-        "游戏不难，就像喜欢你这件事，从来不难。"
-      ],
-      photos: [{ file: "03.jpg", caption: "玩游戏，也要牵手" }]
-    },
-    {
-      chapter: "第八章",
       title: "520 与每日心签",
       kind: "lottery",
       paragraphs: [
@@ -215,11 +203,6 @@ export const loveData = {
     { name: "甜品雷达", description: "爱吃甜，爱喝甜，连生起气来都是甜的。我怀疑她的心情，是一块半糖蛋糕做的。", icon: "sweet" },
     { name: "我们的暗号", description: "噜噜噜是我们在人群里也能找到彼此的频率。别人听是噪音，我听是情话。", icon: "secret" }
   ],
-  gameConfig: {
-    memory: { pairs: 3, time: 60 },
-    catch: { goal: 10, time: 30 },
-    bubbles: { goal: 12, time: 20 }
-  },
   photosDir: "./assets/photos/",
   musicPath: "./assets/music/music.mp3",
   musicTitle: "时光之书的背景音乐"

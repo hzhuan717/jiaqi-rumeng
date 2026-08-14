@@ -353,38 +353,6 @@ function albumHTML() {
     "</div>";
 }
 
-function gameShell(inner, statHTML) {
-  return '<div class="game-area">' +
-    '<div class="game-head"><span>' + statHTML + "</span></div>" +
-    inner +
-    "</div>";
-}
-
-function renderMemoryGame() {
-  const symbols = ["♡", "♥", "❀", "✦", "♢", "♣"];
-  const picked = symbols.slice(0, loveData.gameConfig.memory.pairs).concat(symbols.slice(0, loveData.gameConfig.memory.pairs)).sort(() => Math.random() - 0.5);
-  const cards = picked.map((s, i) =>
-    '<div class="memory-card" data-memory-card data-symbol="' + s + '" data-idx="' + i + '">' +
-    '<div class="m-inner"><div class="m-face m-front">?</div><div class="m-face m-back">' + s + "</div></div>" +
-    "</div>"
-  ).join("");
-  return gameShell('<div class="memory-grid" data-memory-grid>' + cards + "</div>", '记忆翻牌 · 配对全部爱心即通关 <span class="game-stat" data-memory-stat></span>');
-}
-
-function renderCatchGame() {
-  return gameShell(
-    '<div class="catch-stage" data-catch-stage><div class="heart-basket" data-basket>🧺</div></div>',
-    '接爱心 · 接住 ' + loveData.gameConfig.catch.goal + ' 颗 <span class="game-stat" data-catch-stat></span>'
-  );
-}
-
-function renderBubbleGame() {
-  return gameShell(
-    '<div class="bubble-stage" data-bubble-stage><div class="capybara">🦫<span style="font-size:18px">🍊</span></div></div>',
-    '戳泡泡 · 戳破 ' + loveData.gameConfig.bubbles.goal + ' 个 <span class="game-stat" data-bubble-stat></span>'
-  );
-}
-
 function lotteryHTML() {
   const today = todayYMD();
   const idx = state.signIndex === null ? todaySignIndex() : state.signIndex;
@@ -440,11 +408,6 @@ function renderChapter(index) {
       break;
     case "album":
       parts.push(albumHTML());
-      break;
-    case "games":
-      parts.push(renderMemoryGame());
-      parts.push(renderCatchGame());
-      parts.push(renderBubbleGame());
       break;
     case "lottery":
       parts.push(lotteryHTML());
@@ -559,229 +522,6 @@ function musicTrayHTML() {
     "</div>";
 }
 
-/* ---------------- 游戏引擎 ---------------- */
-
-const games = { memory: null, catchGame: null, bubbles: null };
-
-function handleMemoryClick(el) {
-  const g = games.memory = games.memory || {
-    flipped: [],
-    matched: 0,
-    busy: false
-  };
-  if (g.busy) return;
-  const card = el;
-  if (card.classList.contains("is-flipped") || card.classList.contains("is-matched")) return;
-  card.classList.add("is-flipped");
-  g.flipped.push(card);
-  softVibrate(8);
-  if (g.flipped.length === 2) {
-    g.busy = true;
-    const [a, b] = g.flipped;
-    if (a.dataset.symbol === b.dataset.symbol) {
-      window.setTimeout(() => {
-        a.classList.add("is-matched");
-        b.classList.add("is-matched");
-        g.matched += 1;
-        g.flipped = [];
-        g.busy = false;
-        updateMemoryStat();
-        chime();
-        if (g.matched === loveData.gameConfig.memory.pairs) {
-          const stage = card.closest(".game-area");
-          if (stage) showGameOver(stage, true, "记忆小屋 · 翻牌", "全部配对成功！");
-        }
-      }, 420);
-    } else {
-      window.setTimeout(() => {
-        a.classList.remove("is-flipped");
-        b.classList.remove("is-flipped");
-        g.flipped = [];
-        g.busy = false;
-      }, 850);
-    }
-  }
-}
-
-function updateMemoryStat() {
-  const el = root.querySelector("[data-memory-stat]");
-  if (el) el.textContent = (games.memory ? games.memory.matched : 0) + " / " + loveData.gameConfig.memory.pairs + " 对";
-}
-
-function startCatchGame() {
-  const stage = root.querySelector("[data-catch-stage]");
-  if (!stage || games.catchGame) return;
-  const basket = root.querySelector("[data-basket]");
-  const cfg = loveData.gameConfig.catch;
-  const g = games.catchGame = {
-    caught: 0,
-    time: cfg.time,
-    hearts: [],
-    lastSpawn: 0,
-    over: false,
-    raf: 0,
-    lastT: 0
-  };
-  const statEl = root.querySelector("[data-catch-stat]");
-  const updateStat = () => {
-    if (statEl) statEl.textContent = g.caught + " / " + cfg.goal + " 颗 · " + g.time + "s";
-  };
-  updateStat();
-  const timer = window.setInterval(() => {
-    if (g.over) { window.clearInterval(timer); return; }
-    g.time -= 1;
-    updateStat();
-    if (g.time <= 0) {
-      window.clearInterval(timer);
-      g.over = true;
-      showGameOver(stage, g.caught >= cfg.goal, "接爱心", g.caught + " / " + cfg.goal + " 颗");
-    }
-  }, 1000);
-
-  function spawn() {
-    const heart = document.createElement("div");
-    heart.className = "falling-heart";
-    heart.textContent = ["♥", "💙", "❀", "✦"][Math.floor(Math.random() * 4)];
-    heart.style.left = 8 + Math.random() * 76 + "%";
-    const speed = 90 + Math.random() * 70;
-    heart.dataset.speed = String(speed);
-    stage.appendChild(heart);
-    g.hearts.push({ el: heart, x: heart.offsetLeft, y: -30, speed });
-  }
-
-  g.lastT = performance.now();
-  function loop(now) {
-    const dt = Math.min(0.05, (now - g.lastT) / 1000);
-    g.lastT = now;
-    if (!g.over && now - g.lastSpawn > 700) {
-      g.lastSpawn = now;
-      if (g.hearts.length < 4) spawn();
-    }
-    const brect = basket.getBoundingClientRect();
-    const srect = stage.getBoundingClientRect();
-    g.hearts = g.hearts.filter((h) => {
-      h.y += h.speed * dt;
-      h.el.style.transform = "translateY(" + h.y + "px)";
-      const hx = srect.left + h.x;
-      const hy = srect.top + h.y;
-      if (hx > brect.left - 20 && hx < brect.right + 20 && hy > brect.top - 14 && hy < brect.bottom) {
-        h.el.remove();
-        g.caught += 1;
-        updateStat();
-        softVibrate(10);
-        if (g.caught >= cfg.goal) {
-          g.over = true;
-          showGameOver(stage, true, "接爱心", g.caught + " 颗全部接住！");
-          return false;
-        }
-        return false;
-      }
-      if (h.y > 320) { h.el.remove(); return false; }
-      return true;
-    });
-    if (!g.over) g.raf = requestAnimationFrame(loop);
-  }
-  g.raf = requestAnimationFrame(loop);
-
-  const moveBasket = (clientX) => {
-    const srect = stage.getBoundingClientRect();
-    const x = Math.min(Math.max(clientX - srect.left - 42, 4), srect.width - 88);
-    basket.style.left = x + "px";
-    basket.style.transform = "none";
-  };
-  stage.addEventListener("pointermove", (e) => moveBasket(e.clientX));
-  stage.addEventListener("pointerdown", (e) => moveBasket(e.clientX));
-}
-
-function startBubbleGame() {
-  const stage = root.querySelector("[data-bubble-stage]");
-  if (!stage || games.bubbles) return;
-  const cfg = loveData.gameConfig.bubbles;
-  const words = ["爱", "想", "抱", "乖", "甜", "暖", "你", "我", "♡", "✦"];
-  const g = games.bubbles = {
-    count: 0,
-    time: cfg.time,
-    bubbles: [],
-    over: false,
-    lastSpawn: 0
-  };
-  const statEl = root.querySelector("[data-bubble-stat]");
-  const updateStat = () => {
-    if (statEl) statEl.textContent = g.count + " / " + cfg.goal + " 个 · " + g.time + "s";
-  };
-  updateStat();
-  const timer = window.setInterval(() => {
-    if (g.over) { window.clearInterval(timer); return; }
-    g.time -= 1;
-    updateStat();
-    if (g.time <= 0) {
-      window.clearInterval(timer);
-      g.over = true;
-      showGameOver(stage, g.count >= cfg.goal, "戳泡泡", g.count + " / " + cfg.goal + " 个");
-    }
-  }, 1000);
-
-  function spawn() {
-    if (g.bubbles.length >= 6) return;
-    const b = document.createElement("div");
-    b.className = "bubble";
-    const size = 46 + Math.random() * 30;
-    b.style.width = size + "px";
-    b.style.height = size + "px";
-    b.style.left = 6 + Math.random() * 78 + "%";
-    b.style.top = 30 + Math.random() * 60 + "%";
-    b.textContent = words[Math.floor(Math.random() * words.length)];
-    b.dataset.bubble = "1";
-    stage.appendChild(b);
-    g.bubbles.push({ el: b, born: Date.now() });
-  }
-  window.setInterval(() => {
-    if (!g.over) spawn();
-  }, 900);
-  spawn();
-
-  stage.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-bubble]");
-    if (!b || g.over) return;
-    g.count += 1;
-    updateStat();
-    softVibrate(8);
-    b.remove();
-    g.bubbles = g.bubbles.filter((x) => x.el !== b);
-    if (g.count >= cfg.goal) {
-      g.over = true;
-      showGameOver(stage, true, "戳泡泡", "全戳破了！水豚宝宝很开心");
-    }
-  });
-}
-
-function showGameOver(stage, won, name, detail) {
-  if (stage.querySelector(".game-overlay")) return;
-  const overlay = document.createElement("div");
-  overlay.className = "game-overlay";
-  overlay.innerHTML = won
-    ? "<h3>🎉 通关了！</h3><p>" + escapeHtml(name) + " · " + escapeHtml(detail) + "</p>" +
-      '<button data-action="replay-game">再玩一次</button>'
-    : "<h3>还差一点点</h3><p>" + escapeHtml(name) + " · " + escapeHtml(detail) + "</p>" +
-      '<button data-action="replay-game">再来一次</button>';
-  stage.appendChild(overlay);
-}
-
-function stopAllGames() {
-  if (games.catchGame) {
-    games.catchGame.over = true;
-    cancelAnimationFrame(games.catchGame.raf);
-    games.catchGame = null;
-  }
-  if (games.bubbles) {
-    games.bubbles.over = true;
-    games.bubbles = null;
-  }
-  if (games.memory) games.memory = null;
-  root.querySelectorAll(".falling-heart, [data-bubble]").forEach((el) => el.remove());
-  root.querySelectorAll(".game-overlay").forEach((el) => el.remove());
-}
-
 /* ---------------- 事件 ---------------- */
 
 function fullLetterText() {
@@ -837,7 +577,6 @@ function nextPage() {
     state.page += 1;
   }
   saveState();
-  stopAllGames();
   render();
 }
 
@@ -871,11 +610,9 @@ function handleAction(action, el) {
       state.puzzleMsg = "";
       state.puzzleValue = "";
       state.puzzleSolved = false;
-      stopAllGames();
       render();
       break;
     case "jump-page":
-      stopAllGames();
       state.page = Math.max(0, Math.min(TOTAL_PAGES, Number(el.dataset.page)));
       saveState();
       render();
@@ -895,7 +632,6 @@ function handleAction(action, el) {
       nextPage();
       break;
     case "prev-page":
-      stopAllGames();
       state.page = Math.max(1, state.page - 1);
       saveState();
       render();
@@ -962,10 +698,6 @@ function handleAction(action, el) {
       celebrate("heart");
       render();
       break;
-    case "replay-game":
-      stopAllGames();
-      render();
-      break;
     default:
       break;
   }
@@ -975,11 +707,6 @@ root.addEventListener("click", (event) => {
   const actionEl = event.target.closest("[data-action]");
   if (actionEl && root.contains(actionEl)) {
     handleAction(actionEl.dataset.action, actionEl);
-    return;
-  }
-  const memoryCard = event.target.closest("[data-memory-card]");
-  if (memoryCard && root.contains(memoryCard)) {
-    handleMemoryClick(memoryCard);
     return;
   }
   const star = event.target.closest("[data-fallback]");
@@ -1099,20 +826,6 @@ root.addEventListener("pointerup", (event) => {
 });
 root.addEventListener("pointercancel", (event) => {
   if (holdState.target) cancelHold();
-});
-
-/* 页内小游戏自动启动 */
-root.addEventListener("pointerdown", (event) => {
-  if (event.target.closest("[data-catch-stage]")) {
-    startCatchGame();
-  }
-  if (event.target.closest("[data-bubble-stage]")) {
-    startBubbleGame();
-  }
-});
-
-window.addEventListener("beforeunload", () => {
-  stopAllGames();
 });
 
 render();
