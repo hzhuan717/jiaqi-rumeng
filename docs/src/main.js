@@ -2,7 +2,7 @@ import { loveData } from "./data/loveData.js";
 import { escapeHtml, icon } from "./utils/dom.js";
 import { playPocketChime, softVibrate } from "./utils/animation.js";
 
-const STORAGE_KEY = "jiaqi-rumeng-storybook-v2";
+const STORAGE_KEY = "jiaqi-rumeng-storybook-v3";
 const root = document.getElementById("root");
 
 /* ---------------- 工具 ---------------- */
@@ -21,7 +21,6 @@ const stored = readStored();
 const state = {
   unlocked: Boolean(stored.unlocked),
   page: Number(stored.page || 0),
-  fragments: Array.isArray(stored.fragments) ? stored.fragments : [],
   finalUnlocked: Boolean(stored.finalUnlocked),
   received: Boolean(stored.received),
   soundOn: Boolean(stored.soundOn),
@@ -33,12 +32,12 @@ const state = {
   unlockStatus: "",
   puzzleValue: "",
   puzzleMsg: "",
+  puzzleSolved: Boolean(stored.puzzleSolved),
   openGadget: 0,
   blessingName: "",
   blessingCard: "",
   signIndex: null,
   drawingSign: false,
-  albumStars: Number(stored.albumStars || 0),
   copied: false,
   particles: []
 };
@@ -50,12 +49,11 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     unlocked: state.unlocked,
     page: state.page,
-    fragments: state.fragments,
     finalUnlocked: state.finalUnlocked,
     received: state.received,
     soundOn: state.soundOn,
     musicVolume: state.musicVolume,
-    albumStars: state.albumStars
+    puzzleSolved: state.puzzleSolved
   }));
 }
 
@@ -212,25 +210,17 @@ function toast(text) {
   window.setTimeout(() => el.remove(), 2200);
 }
 
-/* ---------------- 碎片 ---------------- */
+/* ---------------- 照片渲染 ---------------- */
 
-function hasFragment(i) { return state.fragments.includes(i); }
-
-function addFragment(i) {
-  if (hasFragment(i)) return false;
-  state.fragments.push(i);
-  saveState();
-  softVibrate(16);
-  celebrate("heart");
-  return true;
-}
-
-function fragmentRack() {
-  const slots = loveData.fragments.names.map((name, i) =>
-    '<div class="fragment-slot ' + (hasFragment(i) ? "filled" : "") + '" title="' + escapeHtml(name) + '">' + (hasFragment(i) ? "✦" : "·") + "</div>"
+function photoStrip(photos, singleClass) {
+  if (!photos || !photos.length) return "";
+  const frames = photos.map((p, i) =>
+    '<figure class="photo-frame' + (photos.length === 1 ? " single" : "") + '" style="--rot:' + ((i % 2 === 0 ? -2 : 2)) + 'deg">' +
+    '<img src="' + loveData.photosDir + p.file + '" alt="' + escapeHtml(p.caption || "照片") + '" loading="lazy" />' +
+    '<figcaption>' + escapeHtml(p.caption || "") + "</figcaption>" +
+    "</figure>"
   ).join("");
-  return '<div class="fragment-rack">' + slots + "</div>" +
-    '<div class="fragment-hint">时光碎片 ' + state.fragments.length + " / " + loveData.fragments.total + " · 集齐后可打开终章</div>";
+  return '<div class="photo-strip' + (singleClass || "") + '">' + frames + "</div>";
 }
 
 /* ---------------- 渲染：顶栏与横幅 ---------------- */
@@ -243,7 +233,7 @@ function liveBanner() {
   const ann = daysUntil(loveData.dates.anniversary);
   const special = todaySpecial();
   return '<div class="live-banner">' + clock + " · 今天 " + todayYMD() +
-    " · 和噜妹在一起 <strong>第 " + together + " 天</strong>" +
+    " · 和小佳在一起 <strong>第 " + together + " 天</strong>" +
     (ann > 0 ? " · 距离一周年还有 <strong>" + ann + " 天</strong>" : "") +
     (special ? ' <span class="today-flag">' + escapeHtml(special) + "</span>" : "") +
     "</div>";
@@ -327,7 +317,7 @@ function factRow() {
   const ann = Math.max(0, daysUntil(loveData.dates.anniversary));
   return '<div class="fact-row">' +
     '<div class="fact-card"><div class="fact-value">' + meet + '</div><div class="fact-unit">天</div><div class="fact-title">初识以来</div></div>' +
-    '<div class="fact-card highlight"><div class="fact-value">' + together + '</div><div class="fact-unit">天</div><div class="fact-title">陪在噜妹身边</div></div>' +
+    '<div class="fact-card highlight"><div class="fact-value">' + together + '</div><div class="fact-unit">天</div><div class="fact-title">陪在小佳身边</div></div>' +
     '<div class="fact-card"><div class="fact-value">' + ann + '</div><div class="fact-unit">天</div><div class="fact-title">距离一周年纪念</div></div>' +
     "</div>";
 }
@@ -357,7 +347,7 @@ function albumHTML() {
   return '<div class="album-grid">' + slots + "</div>" +
     '<div class="album-note">' +
     "把照片放到 <code>assets/photos/01.jpg ~ 06.jpg</code> 就会自动出现。" +
-    "<br/>没有照片的格子先由星星守着。点亮 <strong>3 颗星星</strong>，可收获一枚时光碎片。" +
+    "<br/>没有照片的格子先由星星守着，点一下星星，它就会亮起来。" +
     "</div>";
 }
 
@@ -426,6 +416,7 @@ function renderChapter(index) {
   parts.push('<div class="chapter-kicker">' + escapeHtml(p.chapter) + "</div>");
   parts.push('<div class="chapter-title">' + escapeHtml(p.title) + "</div>");
   if (p.date) parts.push('<div class="chapter-date">' + escapeHtml(p.date) + "</div>");
+  if (p.kind !== "album") parts.push(photoStrip(p.photos));
   parts.push('<div class="chapter-body">' + p.paragraphs.map((t) => "<p>" + escapeHtml(t) + "</p>").join("") + "</div>");
   if (p.art && p.kind !== "album") parts.push(artSVG(p.art));
 
@@ -447,13 +438,11 @@ function renderChapter(index) {
       break;
     case "album":
       parts.push(albumHTML());
-      if (!hasFragment(4)) parts.push(fragmentRack());
       break;
     case "games":
       parts.push(renderMemoryGame());
       parts.push(renderCatchGame());
       parts.push(renderBubbleGame());
-      if (!hasFragment(3)) parts.push(fragmentRack());
       break;
     case "lottery":
       parts.push(lotteryHTML());
@@ -485,22 +474,11 @@ function gadgetListHTML() {
 }
 
 function renderFinalPage() {
-  const ready = state.fragments.length >= loveData.fragments.total;
   const prevFooter = '<div class="page-footer"><span class="page-num">封底 · 未完待续</span>' +
     '<button class="page-nav-btn" data-action="prev-page">← 上一页</button></div>';
-  if (!ready && !state.finalUnlocked) {
-    return '<div class="page"><div class="page-scroll">' +
-      '<div class="chapter-kicker">终章</div>' +
-      '<div class="chapter-title">被封印的情书</div>' +
-      '<div class="chapter-body"><p>这本书的最后一页，被五枚时光碎片封印着。</p>' +
-      "<p>只有读完序章、翻过初见、打开在一起的门、通关记忆小屋、点亮相册星光的人，才能翻开它。</p></div>" +
-      fragmentRack() +
-      '<div class="lock-note">你已集齐 ' + state.fragments.length + " / " + loveData.fragments.total + " 枚碎片。" + (state.fragments.length === 0 ? "先去前几页看看吧。" : "还差一点，继续翻书吧。") + "</div>" +
-      "</div>" + prevFooter + "</div>";
-  }
   if (!state.finalUnlocked) {
     return '<div class="page"><div class="page-scroll"><div class="final-lock">' +
-      '<div class="hold-hint">长按爱心 2 秒，解开最后一页</div>' +
+      '<div class="hold-hint">长按爱心 2 秒，翻开最后一页</div>' +
       '<div class="final-heart" data-long-heart aria-label="长按解锁"></div>' +
       '<div class="hold-percent" data-progress-percent>0%</div>' +
       '<div class="hold-hint">只有足够认真的人，才能打开这页书。</div>' +
@@ -510,6 +488,7 @@ function renderFinalPage() {
   const copied = state.copied ? "已复制" : "复制全文";
   return '<div class="page"><div class="page-scroll"><div class="final-letter">' +
     "<h2>" + escapeHtml(letter.title) + "</h2>" +
+    photoStrip([loveData.finalPhoto]) +
     letter.paragraphs.map((t) => '<p class="f-para">' + escapeHtml(t) + "</p>").join("") +
     '<div class="f-sign">' + escapeHtml(letter.signature) + "</div>" +
     '<div class="final-actions">' +
@@ -531,20 +510,21 @@ function renderCover() {
     '<div class="cover-sub">一本写给时间的情书</div>' +
     '<div class="cover-ornament">✦ ✧ ✦</div>' +
     '<div class="cover-sub">' + escapeHtml(loveData.coverTagline) + "</div>" +
+    '<div class="cover-photo">' + photoStrip([loveData.coverPhoto]) + "</div>" +
     '<button class="cover-btn" data-action="open-book">翻开这本书</button>' +
-    '<div class="cover-live">今天 ' + today + "<br/>已经和噜妹在一起 <b>第 " + together + " 天</b></div>" +
+    '<div class="cover-live">今天 ' + today + "<br/>已经和小佳在一起 <b>第 " + together + " 天</b></div>" +
     "</div>";
 }
 
 function renderUnlock() {
   return '<div class="unlock-page">' +
-    '<div class="u-eyebrow">一本只属于噜妹的书</div>' +
+    '<div class="u-eyebrow">一本只属于小佳的书</div>' +
     '<div class="u-title">佳期如梦</div>' +
     '<div class="u-sub">请输入你的名字，翻开这本书</div>' +
-    '<input class="u-input" data-unlock-input placeholder="噜妹 / 罗佳 / 宝宝…" autocomplete="off" />' +
+    '<input class="u-input" data-unlock-input placeholder="小佳 / 噜妹 / 宝宝…" autocomplete="off" />' +
     '<button class="u-btn" data-action="try-unlock">打开书</button>' +
     '<div class="u-msg">' + escapeHtml(state.unlockMsg) + "</div>" +
-    '<div class="u-hint">提示：黄哥给你的备注，或者他一直喊你的名字</div>' +
+    '<div class="u-hint">提示：小果果给你的备注，或者他一直喊你的名字</div>' +
     "</div>";
 }
 
@@ -581,11 +561,7 @@ function musicTrayHTML() {
 
 const games = { memory: null, catchGame: null, bubbles: null };
 
-function memoryWon() { return state.fragments.includes(3); }
-
 function handleMemoryClick(el) {
-  if (memoryWon()) return;
-  if (games.memory && games.memory.locked) return;
   const g = games.memory = games.memory || {
     flipped: [],
     matched: 0,
@@ -787,13 +763,6 @@ function showGameOver(stage, won, name, detail) {
     : "<h3>还差一点点</h3><p>" + escapeHtml(name) + " · " + escapeHtml(detail) + "</p>" +
       '<button data-action="replay-game">再来一次</button>';
   stage.appendChild(overlay);
-  if (won && addFragment(3)) {
-    const toastEl = document.createElement("div");
-    toastEl.className = "toast";
-    toastEl.textContent = "获得时光碎片「记忆小屋」✨";
-    document.body.appendChild(toastEl);
-    window.setTimeout(() => toastEl.remove(), 2400);
-  }
 }
 
 function stopAllGames() {
@@ -860,21 +829,10 @@ function makeBlessing() {
 }
 
 function nextPage() {
-  const idx = state.page - 1;
   if (state.page === 0) {
     state.page = 1;
-  } else {
-    const cur = loveData.storyPages[idx];
-    if (cur && cur.title === "初见") addFragment(1);
-    if (cur && cur.kind === "puzzle" && !hasFragment(2)) {
-      toast("先答对密码，打开在一起的门～");
-      return;
-    }
-    if (cur && cur.kind === "games" && !hasFragment(3)) {
-      toast("先去记忆小屋玩一局，集齐碎片才能前进");
-      return;
-    }
-    if (state.page < TOTAL_PAGES) state.page += 1;
+  } else if (state.page < TOTAL_PAGES) {
+    state.page += 1;
   }
   saveState();
   stopAllGames();
@@ -906,12 +864,11 @@ function handleAction(action, el) {
       localStorage.removeItem(STORAGE_KEY);
       state.unlocked = false;
       state.page = 0;
-      state.fragments = [];
       state.finalUnlocked = false;
       state.received = false;
-      state.albumStars = 0;
       state.puzzleMsg = "";
       state.puzzleValue = "";
+      state.puzzleSolved = false;
       stopAllGames();
       render();
       break;
@@ -951,7 +908,6 @@ function handleAction(action, el) {
           state.page = 0;
           state.unlockStatus = "";
           state.unlockMsg = "";
-          addFragment(0);
           saveState();
           render();
         }, 1250);
@@ -1020,16 +976,10 @@ root.addEventListener("click", (event) => {
   if (star && root.contains(star)) {
     if (star.dataset.done) return;
     star.dataset.done = "1";
-    state.albumStars += 1;
     softVibrate(8);
     celebrate("spark");
     star.textContent = "✦";
     star.style.color = "#e8c97a";
-    if (state.albumStars >= 3 && addFragment(4)) {
-      const rack = root.querySelector(".fragment-rack");
-      if (rack) rack.outerHTML = fragmentRack();
-      window.setTimeout(() => toast("获得时光碎片「相册星光」✨"), 600);
-    }
     return;
   }
 });
@@ -1044,10 +994,10 @@ root.addEventListener("input", (event) => {
     if (state.puzzleValue.length === 4) {
       if (def && state.puzzleValue === def.puzzle.answer) {
         state.puzzleMsg = "✅ 正确！在一起的日子，永远记得。";
+        state.puzzleSolved = true;
+        saveState();
         softVibrate([14, 22, 14]);
-        if (addFragment(2)) {
-          window.setTimeout(() => toast("获得时光碎片「在一起之门」✨"), 700);
-        }
+        celebrate("heart");
       } else {
         state.puzzleMsg = "❌ 再想想……是 2026 年的那一天。";
         softVibrate(10);
