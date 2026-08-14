@@ -243,7 +243,7 @@ function liveBanner() {
   const ann = daysUntil(loveData.dates.anniversary);
   const special = todaySpecial();
   return '<div class="live-banner">' + clock + " · 今天 " + todayYMD() +
-    " · 和小佳在一起 <strong>第 " + together + " 天</strong>" +
+    " · 和噜妹在一起 <strong>第 " + together + " 天</strong>" +
     (ann > 0 ? " · 距离一周年还有 <strong>" + ann + " 天</strong>" : "") +
     (special ? ' <span class="today-flag">' + escapeHtml(special) + "</span>" : "") +
     "</div>";
@@ -307,9 +307,15 @@ function artSVG(kind) {
   return "";
 }
 
+function puzzlePageDef() {
+  return loveData.storyPages.find((p) => p.puzzle) || null;
+}
+
 function puzzleHTML() {
+  const def = puzzlePageDef();
+  if (!def) return "";
   return '<div class="puzzle-box">' +
-    '<div class="puzzle-hint">🔑 ' + escapeHtml(loveData.storyPages[2].puzzle.hint) + "</div>" +
+    '<div class="puzzle-hint">🔑 ' + escapeHtml(def.puzzle.hint) + "</div>" +
     '<input data-puzzle-input maxlength="4" inputmode="numeric" placeholder="____" value="' + escapeHtml(state.puzzleValue) + '" />' +
     '<div class="puzzle-feedback">' + escapeHtml(state.puzzleMsg) + "</div>" +
     "</div>";
@@ -320,8 +326,8 @@ function factRow() {
   const meet = dayCount(loveData.dates.firstMeet);
   const ann = Math.max(0, daysUntil(loveData.dates.anniversary));
   return '<div class="fact-row">' +
-    '<div class="fact-card"><div class="fact-value">' + meet + '</div><div class="fact-unit">天</div><div class="fact-title">遇见小佳以来</div></div>' +
-    '<div class="fact-card highlight"><div class="fact-value">' + together + '</div><div class="fact-unit">天</div><div class="fact-title">陪在小佳身边</div></div>' +
+    '<div class="fact-card"><div class="fact-value">' + meet + '</div><div class="fact-unit">天</div><div class="fact-title">初识以来</div></div>' +
+    '<div class="fact-card highlight"><div class="fact-value">' + together + '</div><div class="fact-unit">天</div><div class="fact-title">陪在噜妹身边</div></div>' +
     '<div class="fact-card"><div class="fact-value">' + ann + '</div><div class="fact-unit">天</div><div class="fact-title">距离一周年纪念</div></div>' +
     "</div>";
 }
@@ -421,42 +427,46 @@ function renderChapter(index) {
   parts.push('<div class="chapter-title">' + escapeHtml(p.title) + "</div>");
   if (p.date) parts.push('<div class="chapter-date">' + escapeHtml(p.date) + "</div>");
   parts.push('<div class="chapter-body">' + p.paragraphs.map((t) => "<p>" + escapeHtml(t) + "</p>").join("") + "</div>");
-  if (p.art) parts.push(artSVG(p.art));
-  if (index === 0) {
-    parts.push('<div class="daily-line">' + escapeHtml(dailyLine()) + "</div>");
+  if (p.art && p.kind !== "album") parts.push(artSVG(p.art));
+
+  switch (p.kind) {
+    case "prologue":
+      parts.push('<div class="daily-line">' + escapeHtml(dailyLine()) + "</div>");
+      break;
+    case "facts":
+      parts.push(factRow());
+      parts.push(countdownBar());
+      break;
+    case "puzzle":
+      parts.push(factRow());
+      parts.push(countdownBar());
+      parts.push(puzzleHTML());
+      break;
+    case "gadgets":
+      parts.push(gadgetListHTML());
+      break;
+    case "album":
+      parts.push(albumHTML());
+      if (!hasFragment(4)) parts.push(fragmentRack());
+      break;
+    case "games":
+      parts.push(renderMemoryGame());
+      parts.push(renderCatchGame());
+      parts.push(renderBubbleGame());
+      if (!hasFragment(3)) parts.push(fragmentRack());
+      break;
+    case "lottery":
+      parts.push(lotteryHTML());
+      parts.push(blessingHTML());
+      break;
+    default:
+      break;
   }
-  if (index === 1 || index === 2) {
-    parts.push(factRow());
-    parts.push(countdownBar());
-  }
-  if (index === 1 && hasFragment(0) && !hasFragment(1)) {
-    parts.push(fragmentRack());
-  }
-  if (index === 2) {
-    parts.push(puzzleHTML());
-  }
-  if (index === 3) {
-    parts.push(albumHTML());
-    if (!hasFragment(4)) parts.push(fragmentRack());
-  }
-  if (index === 4) {
-    parts.push(renderMemoryGame());
-    parts.push(renderCatchGame());
-    parts.push(renderBubbleGame());
-    if (!hasFragment(3)) parts.push(fragmentRack());
-  }
-  if (index === 5) {
-    parts.push(gadgetListHTML());
-  }
-  if (index === 6) {
-    parts.push(lotteryHTML());
-    parts.push(blessingHTML());
-  }
-  const nextLocked = index === 4 && !hasFragment(3);
+
   const isFinalPage = index === loveData.storyPages.length - 1;
   const footer = '<div class="page-footer">' +
     '<span class="page-num">第 ' + (index + 2) + " 页 / " + TOTAL_PAGES + "</span>" +
-    '<button class="page-nav-btn' + (nextLocked ? " is-locked" : "") + '" data-action="next-page">' + (isFinalPage ? "前往终章" : "下一章") + " →</button>" +
+    '<button class="page-nav-btn" data-action="next-page">' + (isFinalPage ? "前往终章" : "下一章") + " →</button>" +
     "</div>";
   return '<div class="page"><div class="page-scroll">' + parts.join("") + "</div>" + footer + "</div>";
 }
@@ -465,7 +475,7 @@ function gadgetListHTML() {
   return '<div class="gadget-list">' + loveData.gadgets.map((g, i) =>
     '<div class="gadget-card ' + (state.openGadget === i ? "is-open" : "") + '">' +
     '<button class="gadget-head" data-action="toggle-gadget" data-index="' + i + '">' +
-    '<span class="gadget-icon">' + ["🔍", "🌀", "🔔", "🛡️", "📖"][i] + "</span>" +
+    '<span class="gadget-icon">' + ["😤", "😂", "🔵", "💰", "🍬", "📣"][i] + "</span>" +
     '<span class="g-name">' + escapeHtml(g.name) + "</span>" +
     '<span class="g-arrow">›</span>' +
     "</button>" +
@@ -522,19 +532,19 @@ function renderCover() {
     '<div class="cover-ornament">✦ ✧ ✦</div>' +
     '<div class="cover-sub">' + escapeHtml(loveData.coverTagline) + "</div>" +
     '<button class="cover-btn" data-action="open-book">翻开这本书</button>' +
-    '<div class="cover-live">今天 ' + today + "<br/>已经和小佳在一起 <b>第 " + together + " 天</b></div>" +
+    '<div class="cover-live">今天 ' + today + "<br/>已经和噜妹在一起 <b>第 " + together + " 天</b></div>" +
     "</div>";
 }
 
 function renderUnlock() {
   return '<div class="unlock-page">' +
-    '<div class="u-eyebrow">一本只属于小佳的书</div>' +
+    '<div class="u-eyebrow">一本只属于噜妹的书</div>' +
     '<div class="u-title">佳期如梦</div>' +
     '<div class="u-sub">请输入你的名字，翻开这本书</div>' +
-    '<input class="u-input" data-unlock-input placeholder="小佳 / 小乖 / 罗佳…" autocomplete="off" />' +
+    '<input class="u-input" data-unlock-input placeholder="噜妹 / 罗佳 / 宝宝…" autocomplete="off" />' +
     '<button class="u-btn" data-action="try-unlock">打开书</button>' +
     '<div class="u-msg">' + escapeHtml(state.unlockMsg) + "</div>" +
-    '<div class="u-hint">提示：小果果一直喊你的那个名字</div>' +
+    '<div class="u-hint">提示：黄哥给你的备注，或者他一直喊你的名字</div>' +
     "</div>";
 }
 
@@ -854,8 +864,13 @@ function nextPage() {
   if (state.page === 0) {
     state.page = 1;
   } else {
-    if (idx === 1) addFragment(1);
-    if (idx === 4 && !hasFragment(3)) {
+    const cur = loveData.storyPages[idx];
+    if (cur && cur.title === "初见") addFragment(1);
+    if (cur && cur.kind === "puzzle" && !hasFragment(2)) {
+      toast("先答对密码，打开在一起的门～");
+      return;
+    }
+    if (cur && cur.kind === "games" && !hasFragment(3)) {
       toast("先去记忆小屋玩一局，集齐碎片才能前进");
       return;
     }
@@ -1025,8 +1040,9 @@ root.addEventListener("input", (event) => {
   if (t.matches("[data-puzzle-input]")) {
     state.puzzleValue = t.value.replace(/\D/g, "").slice(0, 4);
     t.value = state.puzzleValue;
+    const def = puzzlePageDef();
     if (state.puzzleValue.length === 4) {
-      if (state.puzzleValue === loveData.storyPages[2].puzzle.answer) {
+      if (def && state.puzzleValue === def.puzzle.answer) {
         state.puzzleMsg = "✅ 正确！在一起的日子，永远记得。";
         softVibrate([14, 22, 14]);
         if (addFragment(2)) {
