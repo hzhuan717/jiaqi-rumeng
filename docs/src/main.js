@@ -1,6 +1,6 @@
 import { loveData } from "./data/loveData.js";
 import { escapeHtml, icon } from "./utils/dom.js";
-import { playPocketChime, softVibrate } from "./utils/animation.js";
+import { playPocketChime, softVibrate, animateCounters } from "./utils/animation.js";
 
 const STORAGE_KEY = "jiaqi-rumeng-storybook-v3";
 const root = document.getElementById("root");
@@ -186,7 +186,7 @@ function stopMusic() {
 function celebrate(kind) {
   chime();
   const glyphs = kind === "heart" ? ["♡", "♥", "✦", "❀"] : ["✦", "✧", "♡", "·"];
-  const colors = kind === "heart" ? ["#ff8eb6", "#ffb35c", "#48a9ff", "#ffffff"] : ["#4daeff", "#ff8eb6", "#ffc86b", "#ffffff"];
+  const colors = kind === "heart" ? ["#d4a5a5", "#e8b8a0", "#e0b56c", "#ffffff"] : ["#7a9cc6", "#d4a5a5", "#e0b56c", "#ffffff"];
   const count = kind === "heart" ? 20 : 14;
   const list = Array.from({ length: count }, (_, i) => ({
     id: Date.now() + Math.random() * 10000 + i,
@@ -204,6 +204,25 @@ function celebrate(kind) {
   }, 1800);
 }
 
+function bigCelebrate() {
+  chime();
+  const glyphs = ["♥", "✦", "❀", "🌸", "♡"];
+  const colors = ["#e8b8a0", "#d4a5a5", "#ffd9c0", "#ffffff", "#e0b56c"];
+  const layer = root.querySelector(".celebration-layer");
+  if (!layer) return;
+  layer.innerHTML = Array.from({ length: 56 }, () => {
+    const glyph = glyphs[Math.floor(Math.random() * glyphs.length)];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const left = 4 + Math.random() * 92;
+    const delay = Math.random() * 0.9;
+    const size = 16 + Math.random() * 22;
+    return '<span class="big-particle" style="left:' + left + '%;top:-' + (4 + Math.random() * 20) + '%;color:' + color + ';font-size:' + size + 'px;animation-delay:' + delay + 's">' + glyph + "</span>";
+  }).join("");
+  window.setTimeout(() => {
+    if (layer) layer.innerHTML = "";
+  }, 3400);
+}
+
 function toast(text) {
   const el = document.createElement("div");
   el.className = "toast";
@@ -214,15 +233,16 @@ function toast(text) {
 
 /* ---------------- 照片渲染 ---------------- */
 
-function photoStrip(photos, singleClass) {
+function photoStrip(photos, stamp) {
   if (!photos || !photos.length) return "";
   const frames = photos.map((p, i) =>
     '<figure class="photo-frame' + (photos.length === 1 ? " single" : "") + '" style="--rot:' + ((i % 2 === 0 ? -2 : 2)) + 'deg">' +
     '<img src="' + loveData.photosDir + p.file + '" alt="' + escapeHtml(p.caption || "照片") + '" loading="lazy" />' +
+    (stamp ? '<span class="photo-stamp">' + escapeHtml(stamp) + "</span>" : "") +
     '<figcaption>' + escapeHtml(p.caption || "") + "</figcaption>" +
     "</figure>"
   ).join("");
-  return '<div class="photo-strip' + (singleClass || "") + '">' + frames + "</div>";
+  return '<div class="photo-strip">' + frames + "</div>";
 }
 
 /* ---------------- 渲染：顶栏与横幅 ---------------- */
@@ -318,9 +338,9 @@ function factRow() {
   const meet = dayCount(loveData.dates.firstMeet);
   const ann = Math.max(0, daysUntil(loveData.dates.anniversary));
   return '<div class="fact-row">' +
-    '<div class="fact-card"><div class="fact-value">' + meet + '</div><div class="fact-unit">天</div><div class="fact-title">初识以来</div></div>' +
-    '<div class="fact-card highlight"><div class="fact-value">' + together + '</div><div class="fact-unit">天</div><div class="fact-title">陪在小佳身边</div></div>' +
-    '<div class="fact-card"><div class="fact-value">' + ann + '</div><div class="fact-unit">天</div><div class="fact-title">距离一周年纪念</div></div>' +
+    '<div class="fact-card"><div class="fact-value" data-count-to="' + meet + '">0</div><div class="fact-unit">天</div><div class="fact-title">初识以来</div></div>' +
+    '<div class="fact-card highlight"><div class="fact-value" data-count-to="' + together + '">0</div><div class="fact-unit">天</div><div class="fact-title">陪在小佳身边</div></div>' +
+    '<div class="fact-card"><div class="fact-value" data-count-to="' + ann + '">0</div><div class="fact-unit">天</div><div class="fact-title">距离一周年纪念</div></div>' +
     "</div>";
 }
 
@@ -386,7 +406,7 @@ function renderChapter(index) {
   parts.push('<div class="chapter-kicker">' + escapeHtml(p.chapter) + "</div>");
   parts.push('<div class="chapter-title">' + escapeHtml(p.title) + "</div>");
   if (p.date) parts.push('<div class="chapter-date">' + escapeHtml(p.date) + "</div>");
-  if (p.kind !== "album") parts.push(photoStrip(p.photos));
+  if (p.kind !== "album") parts.push(photoStrip(p.photos, p.date ? p.date.replace(/-/g, ".") : null));
   parts.push('<div class="chapter-body">' + p.paragraphs.map((t) => "<p>" + escapeHtml(t) + "</p>").join("") + "</div>");
   if (p.art && p.kind !== "album") parts.push(artSVG(p.art));
 
@@ -442,9 +462,16 @@ function renderFinalPage() {
   const prevFooter = '<div class="page-footer"><span class="page-num">封底 · 未完待续</span>' +
     '<button class="page-nav-btn" data-action="prev-page">← 上一页</button></div>';
   if (!state.finalUnlocked) {
+    const orbitDots = Array.from({ length: 8 }, (_, i) => "<span></span>").join("");
     return '<div class="page"><div class="page-scroll"><div class="final-lock">' +
       '<div class="hold-hint">长按爱心 2 秒，翻开最后一页</div>' +
-      '<div class="final-heart" data-long-heart aria-label="长按解锁"></div>' +
+      '<div class="final-heart" data-long-heart aria-label="长按解锁">' +
+      '<svg viewBox="0 0 100 100">' +
+      '<path class="heart-base" d="M50 85 C25 65 10 48 10 30 C10 18 20 10 30 10 C40 10 47 16 50 24 C53 16 60 10 70 10 C80 10 90 18 90 30 C90 48 75 65 50 85 Z"/>' +
+      '<path class="heart-fill" d="M50 85 C25 65 10 48 10 30 C10 18 20 10 30 10 C40 10 47 16 50 24 C53 16 60 10 70 10 C80 10 90 18 90 30 C90 48 75 65 50 85 Z"/>' +
+      "</svg>" +
+      '<div class="orbit-dots">' + orbitDots + "</div>" +
+      "</div>" +
       '<div class="hold-percent" data-progress-percent>0%</div>' +
       '<div class="hold-hint">只有足够认真的人，才能打开这页书。</div>' +
       "</div></div>" + prevFooter + "</div>";
@@ -453,12 +480,12 @@ function renderFinalPage() {
   const copied = state.copied ? "已复制" : "复制全文";
   return '<div class="page"><div class="page-scroll"><div class="final-letter">' +
     "<h2>" + escapeHtml(letter.title) + "</h2>" +
-    photoStrip([loveData.finalPhoto]) +
+    photoStrip([loveData.finalPhoto], todayYMD().replace(/-/g, ".")) +
     letter.paragraphs.map((t) => '<p class="f-para">' + escapeHtml(t) + "</p>").join("") +
-    '<div class="f-sign">' + escapeHtml(letter.signature) + "</div>" +
+    '<div class="f-sign">' + escapeHtml(letter.signature) + '<span class="sign-seal">♥</span></div>' +
     '<div class="final-actions">' +
     '<button class="is-primary" data-action="copy-letter">📋 ' + copied + "</button>" +
-    (state.received ? '<button class="is-primary">💙 ' + escapeHtml(letter.receivedText) + "</button>" : '<button class="is-primary" data-action="receive-love">💙 收下这份喜欢</button>') +
+    (state.received ? '<button class="is-primary">💙 ' + escapeHtml(letter.receivedText) + "</button>" : '<button class="is-primary" data-action="receive-love">♥ 收下这份喜欢</button>') +
     "</div>" +
     (state.received ? '<div class="received-note">' + escapeHtml(letter.receivedText) + "</div>" : "") +
     "</div></div>" +
@@ -469,14 +496,19 @@ function renderFinalPage() {
 function renderCover() {
   const today = todayYMD();
   const together = dayCount(loveData.dates.start);
+  const stamp = loveData.dates.start.replace(/-/g, ".");
+  const orbitDots = Array.from({ length: 24 }, (_, i) =>
+    '<span class="orbit-dot" style="left:' + ((i * 41 + 5) % 92) + "%;top:" + ((i * 37 + 9) % 88) + "%;animation-delay:" + ((i * 0.8) % 9) + "s;animation-duration:" + (7 + (i % 4)) + 's"></span>'
+  ).join("");
   return '<div class="cover">' +
+    '<div class="cover-orbit">' + orbitDots + "</div>" +
     '<div class="cover-eyebrow">LOVE LETTER · 2026</div>' +
     '<div class="cover-title">佳期如梦</div>' +
     '<div class="cover-sub">一本写给时间的情书</div>' +
-    '<div class="cover-ornament">✦ ✧ ✦</div>' +
+    '<div class="cover-goldline">◆</div>' +
     '<div class="cover-sub">' + escapeHtml(loveData.coverTagline) + "</div>" +
-    '<div class="cover-photo">' + photoStrip([loveData.coverPhoto]) + "</div>" +
-    '<button class="cover-btn" data-action="open-book">翻开这本书</button>' +
+    '<div class="cover-photo">' + photoStrip([loveData.coverPhoto], stamp) + "</div>" +
+    '<button class="cover-btn" data-action="open-book"><span class="seal-heart">♥</span>翻开这本书</button>' +
     '<div class="cover-live">今天 ' + today + "<br/>已经和小佳在一起 <b>第 " + together + " 天</b></div>" +
     "</div>";
 }
@@ -500,23 +532,54 @@ function renderMain() {
   return renderFinalPage();
 }
 
+function renderSceneBg() {
+  const far = Array.from({ length: 16 }, (_, i) =>
+    '<span class="twinkle" style="left:' + ((i * 61 + 11) % 95) + "%;top:" + ((i * 41 + 7) % 88) + "%;animation-delay:" + ((i * 0.53) % 4) + 's">✦</span>'
+  ).join("");
+  const near = Array.from({ length: 6 }, (_, i) =>
+    '<span class="twinkle near" style="left:' + ((i * 137 + 23) % 92) + "%;top:" + ((i * 73 + 31) % 80) + "%;animation-delay:" + ((i * 0.71 + 0.2) % 3) + 's">✧</span>'
+  ).join("");
+  return '<div class="scene-bg" aria-hidden="true">' + far + near + '<div class="moon"></div></div>';
+}
+
+let meteorTimer = null;
+function scheduleMeteors() {
+  if (meteorTimer) return;
+  const spawn = () => {
+    const bg = document.querySelector(".scene-bg");
+    if (!bg) return;
+    const m = document.createElement("span");
+    m.className = "meteor";
+    m.style.top = 4 + Math.random() * 26 + "%";
+    m.style.left = 45 + Math.random() * 50 + "%";
+    bg.appendChild(m);
+    window.setTimeout(() => m.remove(), 1200);
+  };
+  window.setTimeout(spawn, 4200);
+  meteorTimer = window.setInterval(() => {
+    spawn();
+    window.setTimeout(spawn, 900 + Math.random() * 900);
+  }, 16000 + Math.random() * 14000);
+}
+
 function render() {
   probeMusic();
+  scheduleMeteors();
   root.innerHTML = '<main class="app-shell"><div class="phone-shell">' +
-    '<div class="scene-bg" aria-hidden="true">' + Array.from({ length: 14 }, (_, i) =>
-      '<span class="twinkle" style="left:' + (i * 7 + 3) + "%;top:" + ((i * 17) % 90) + "%;animation-delay:" + (i * 0.37) + 's">✦</span>'
-    ).join("") + '<div class="moon"></div></div>' +
+    renderSceneBg() +
     topControls() +
     (state.unlocked && state.page > 0 ? liveBanner() : "") +
     '<div class="book-wrap">' + renderMain() + "</div>" +
     "</div></main>" +
     '<div class="celebration-layer"></div>' +
     (state.unlocked && state.page > 0 && state.musicAvailable && state.musicOn ? musicTrayHTML() : "");
+  window.requestAnimationFrame(() => animateCounters(root));
 }
 
 function musicTrayHTML() {
   return '<div class="music-tray">' +
     '<div class="m-row"><span class="m-name">🎵 ' + escapeHtml(loveData.musicTitle) + "</span>" +
+    '<span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' +
     '<input type="range" min="0" max="1" step="0.05" value="' + state.musicVolume + '" data-music-volume aria-label="音量" />' +
     '<button class="m-close" data-action="close-music">✕</button></div>' +
     "</div>";
@@ -695,7 +758,7 @@ function handleAction(action, el) {
       state.received = true;
       saveState();
       softVibrate([18, 32, 18]);
-      celebrate("heart");
+      bigCelebrate();
       render();
       break;
     default:
@@ -715,8 +778,7 @@ root.addEventListener("click", (event) => {
     star.dataset.done = "1";
     softVibrate(8);
     celebrate("spark");
-    star.textContent = "✦";
-    star.style.color = "#e8c97a";
+    star.classList.add("is-lit");
     return;
   }
 });
@@ -773,9 +835,9 @@ root.addEventListener("error", (event) => {
 const holdState = { target: null, frame: 0, start: 0 };
 
 function setHoldProgress(progress) {
-  const heart = holdState.target;
+  const fill = root.querySelector(".heart-fill");
   const percent = root.querySelector("[data-progress-percent]");
-  if (heart) heart.style.transform = "scale(" + (1 + progress * 0.15) + ")";
+  if (fill) fill.style.clipPath = "inset(" + ((1 - progress) * 100) + "% 0 0 0)";
   if (percent) percent.textContent = Math.round(progress * 100) + "%";
 }
 
