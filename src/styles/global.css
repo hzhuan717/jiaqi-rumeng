@@ -19,7 +19,15 @@
   --hand: "Ma Shan Zheng", "Segoe Script", "KaiTi", "STKaiti", cursive;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 
 html, body { height: 100%; }
 
@@ -131,6 +139,7 @@ img { max-width: 100%; display: block; }
     inset 0 0 0 5px rgba(255, 255, 255, 0.55);
   overflow: hidden;
   min-height: 86vh;
+  min-height: 86dvh;
   display: flex;
   flex-direction: column;
   animation: breathe 7s ease-in-out infinite;
@@ -148,7 +157,7 @@ img { max-width: 100%; display: block; }
 }
 @media (max-width: 470px) {
   .app-shell { padding: 0; }
-  .phone-shell { border-radius: 0; min-height: 100vh; box-shadow: inset 0 0 0 1px #e0d5c0; }
+  .phone-shell { border-radius: 0; min-height: 100vh; min-height: 100dvh; box-shadow: inset 0 0 0 1px #e0d5c0; }
 }
 @keyframes breathe {
   0%, 100% { transform: translateY(0); }
@@ -189,8 +198,8 @@ img { max-width: 100%; display: block; }
 }
 .progress-dots { display: flex; gap: 4px; align-items: center; }
 .progress-dot {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   font-size: 9px;
   line-height: 1;
   color: #c9bfae;
@@ -443,6 +452,7 @@ img { max-width: 100%; display: block; }
   overflow-x: hidden;
   padding-right: 4px;
   position: relative;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 165, 165, 0.5) transparent;
 }
@@ -536,10 +546,13 @@ img { max-width: 100%; display: block; }
     inset 0 2px 8px rgba(60, 40, 20, 0.1),
     inset 0 -2px 4px rgba(60, 40, 20, 0.06),
     0 10px 26px rgba(26, 20, 16, 0.24);
-  transform: rotate(var(--rot, -2deg));
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: box-shadow 0.3s ease;
   width: min(62%, 240px);
-  animation: breathe 8s ease-in-out infinite;
+  animation: photo-breathe 8s ease-in-out infinite;
+}
+@keyframes photo-breathe {
+  0%, 100% { transform: rotate(var(--rot, -2deg)) translateY(0); }
+  50% { transform: rotate(var(--rot, -2deg)) translateY(-3px); }
 }
 .photo-frame::after {
   content: "";
@@ -556,6 +569,7 @@ img { max-width: 100%; display: block; }
     0 16px 36px rgba(26, 20, 16, 0.32),
     0 0 24px rgba(232, 184, 160, 0.2);
 }
+.photo-frame:hover { animation-play-state: paused; }
 .photo-frame.single { width: min(78%, 300px); }
 .photo-frame img {
   width: 100%;
@@ -1154,7 +1168,7 @@ img { max-width: 100%; display: block; }
 /* ---------- 音乐托盘 ---------- */
 .music-tray {
   position: absolute;
-  bottom: 62px;
+  bottom: 70px;
   left: 12px;
   right: 12px;
   z-index: 40;

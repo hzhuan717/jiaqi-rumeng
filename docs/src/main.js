@@ -141,23 +141,33 @@ function chime() {
 
 let musicEl = null;
 let musicCheckDone = false;
+let musicStarting = false;
+let musicMissingNotified = false;
+
+function preloadMusic() {
+  if (musicEl) return;
+  musicEl = new Audio(loveData.musicPath);
+  musicEl.loop = true;
+  musicEl.volume = state.musicVolume;
+  musicEl.preload = "auto";
+  musicEl.load();
+}
 
 function probeMusic() {
   if (musicCheckDone) return;
   musicCheckDone = true;
-  const probe = new Image();
-  probe.onerror = () => {
-    fetch(loveData.musicPath, { method: "HEAD" })
-      .then((r) => { state.musicAvailable = r.ok; })
-      .catch(() => { state.musicAvailable = false; });
-  };
-  probe.src = loveData.musicPath;
-  probe.onload = () => { state.musicAvailable = true; };
-  if (probe.complete && probe.naturalWidth === 0) {
-    fetch(loveData.musicPath, { method: "HEAD" })
-      .then((r) => { state.musicAvailable = r.ok; })
-      .catch(() => { state.musicAvailable = false; });
-  }
+  fetch(loveData.musicPath, { method: "HEAD" })
+    .then((r) => {
+      state.musicAvailable = r.ok;
+      if (r.ok) preloadMusic();
+    })
+    .catch(() => {
+      state.musicAvailable = false;
+    });
+}
+
+function markMusicState() {
+  document.body.dataset.music = state.musicOn ? "playing" : "paused";
 }
 
 function startMusic() {
@@ -165,20 +175,38 @@ function startMusic() {
     musicEl = new Audio(loveData.musicPath);
     musicEl.loop = true;
     musicEl.volume = state.musicVolume;
+    musicEl.preload = "auto";
   }
+  if (!musicEl.paused) {
+    state.musicOn = true;
+    state.musicAvailable = true;
+    markMusicState();
+    return;
+  }
+  if (musicStarting) return;
+  musicStarting = true;
   musicEl.play().then(() => {
     state.musicOn = true;
     state.musicAvailable = true;
+    musicStarting = false;
+    markMusicState();
     chime();
   }).catch(() => {
+    musicStarting = false;
     state.musicAvailable = false;
     state.musicOn = false;
+    markMusicState();
+    if (!musicMissingNotified) {
+      musicMissingNotified = true;
+      toast("没有找到音乐文件，把音乐放到 assets/music/music.mp3");
+    }
   });
 }
 
 function stopMusic() {
   if (musicEl) musicEl.pause();
   state.musicOn = false;
+  markMusicState();
 }
 
 /* ---------------- 粒子 ---------------- */
@@ -521,7 +549,7 @@ function renderUnlock() {
     '<input class="u-input" data-unlock-input placeholder="小佳 / 噜妹 / 宝宝…" autocomplete="off" />' +
     '<button class="u-btn" data-action="try-unlock">打开书</button>' +
     '<div class="u-msg">' + escapeHtml(state.unlockMsg) + "</div>" +
-    '<div class="u-hint">提示：小果果给你的备注，或者他一直喊你的名字</div>' +
+    '<div class="u-hint">提示：小果果给你的备注，或者他一直喊你的名字<br/>打开书的那一刻，音乐会自动响起 ♪</div>' +
     "</div>";
 }
 
@@ -609,8 +637,9 @@ async function copyLetter() {
       ta.remove();
     }
     state.copied = true;
+        render();
+
     celebrate("heart");
-    render();
     window.setTimeout(() => { state.copied = false; render(); }, 1600);
   } catch {
     state.copied = false;
@@ -629,8 +658,9 @@ function makeBlessing() {
     r(tpl.opening) + escapeHtml(name) + r(tpl.middle) +
     "<span class=\"b-sign\">" + r(tpl.closing) + "</span>";
   chime();
+    render();
+
   celebrate("heart");
-  render();
 }
 
 function nextPage() {
@@ -652,10 +682,6 @@ function handleAction(action, el) {
       render();
       break;
     case "toggle-music":
-      if (!state.musicAvailable) {
-        toast("把音乐文件放到 assets/music/music.mp3 后刷新即可");
-        return;
-      }
       if (state.musicOn) stopMusic();
       else startMusic();
       render();
@@ -684,12 +710,12 @@ function handleAction(action, el) {
       state.page = 1;
       saveState();
       softVibrate(12);
-      celebrate("spark");
       if (!state.musicOn) {
         startMusic();
         saveState();
       }
       render();
+      celebrate("spark");
       break;
     case "next-page":
       nextPage();
@@ -706,8 +732,8 @@ function handleAction(action, el) {
         state.unlockStatus = "opening";
         state.unlockMsg = "叮咚！认证成功。这本时光之书正在为你打开……";
         softVibrate([16, 30, 16]);
-        celebrate("unlock");
         render();
+        celebrate("unlock");
         if (!state.musicOn) {
           startMusic();
           saveState();
@@ -743,8 +769,9 @@ function handleAction(action, el) {
         if (next === state.signIndex) next = (next + 1) % loveData.lotterySigns.length;
         state.signIndex = next;
         state.drawingSign = false;
+                render();
+
         celebrate("heart");
-        render();
       }, 520);
       break;
     }
@@ -758,8 +785,9 @@ function handleAction(action, el) {
       state.received = true;
       saveState();
       softVibrate([18, 32, 18]);
+            render();
+
       bigCelebrate();
-      render();
       break;
     default:
       break;
@@ -790,13 +818,14 @@ root.addEventListener("input", (event) => {
     state.puzzleValue = t.value.replace(/\D/g, "").slice(0, 4);
     t.value = state.puzzleValue;
     const def = puzzlePageDef();
+    let won = false;
     if (state.puzzleValue.length === 4) {
       if (def && state.puzzleValue === def.puzzle.answer) {
         state.puzzleMsg = "✅ 正确！在一起的日子，永远记得。";
         state.puzzleSolved = true;
         saveState();
         softVibrate([14, 22, 14]);
-        celebrate("heart");
+        won = true;
       } else {
         state.puzzleMsg = "❌ 再想想……是 2026 年的那一天。";
         softVibrate(10);
@@ -805,6 +834,7 @@ root.addEventListener("input", (event) => {
       state.puzzleMsg = "";
     }
     render();
+    if (won) celebrate("heart");
   }
   if (t.matches("[data-bless-input]")) state.blessingName = t.value;
   if (t.matches("[data-music-volume]")) {
@@ -855,9 +885,9 @@ function finishHold() {
   state.finalUnlocked = true;
   saveState();
   softVibrate([20, 28, 20]);
-  celebrate("heart");
   holdState.target = null;
   render();
+  celebrate("heart");
 }
 
 function tickHold(now) {
