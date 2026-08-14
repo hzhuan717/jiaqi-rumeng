@@ -1,0 +1,6 @@
+# 旧版备份产物（保留源码即可）
+netlify-ready/
+*.zip
+
+# 运行缓存
+node_modules/
