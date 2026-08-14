@@ -168,9 +168,11 @@ function startMusic() {
   }
   musicEl.play().then(() => {
     state.musicOn = true;
+    state.musicAvailable = true;
     chime();
   }).catch(() => {
     state.musicAvailable = false;
+    state.musicOn = false;
   });
 }
 
@@ -883,6 +885,10 @@ function handleAction(action, el) {
       saveState();
       softVibrate(12);
       celebrate("spark");
+      if (!state.musicOn) {
+        startMusic();
+        saveState();
+      }
       render();
       break;
     case "next-page":
@@ -903,6 +909,10 @@ function handleAction(action, el) {
         softVibrate([16, 30, 16]);
         celebrate("unlock");
         render();
+        if (!state.musicOn) {
+          startMusic();
+          saveState();
+        }
         window.setTimeout(() => {
           state.unlocked = true;
           state.page = 0;
