@@ -500,13 +500,25 @@ img { max-width: 100%; display: block; }
   position: relative;
   background: linear-gradient(165deg, #eaf4ff, #dcecff);
   border: 1px solid rgba(61, 125, 209, 0.16);
+}
+.album-slot img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+}
+.album-slot .album-slot-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   color: rgba(61, 125, 209, 0.5);
   font-size: 26px;
 }
-.album-slot img { width: 100%; height: 100%; object-fit: cover; }
 .album-slot .album-tag {
   position: absolute;
   bottom: 4px;

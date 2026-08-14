@@ -345,7 +345,7 @@ function albumHTML() {
   const slots = Array.from({ length: 6 }, (_, i) => {
     const file = "0" + (i + 1) + ".jpg";
     const src = loveData.photosDir + file;
-    return '<div class="album-slot" data-album-slot="' + i + '"><img src="' + src + '" alt="照片 ' + (i + 1) + '" loading="lazy" data-photo>' +
+    return '<div class="album-slot" data-album-slot="' + i + '"><img src="' + src + '" alt="照片 ' + (i + 1) + '" data-photo>' +
       '<div class="album-slot-fallback" data-fallback>🌟</div><div class="album-tag">PHOTO ' + (i + 1) + "</div></div>";
   }).join("");
   return '<div class="album-grid">' + slots + "</div>" +
