@@ -276,14 +276,10 @@ function photoStrip(photos, stamp) {
 /* ---------------- 渲染：顶栏与横幅 ---------------- */
 
 function liveBanner() {
-  const t = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  const clock = pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds());
   const together = dayCount(loveData.dates.start);
   const ann = daysUntil(loveData.dates.anniversary);
   const special = todaySpecial();
-  return '<div class="live-banner">' + clock + " · 今天 " + todayYMD() +
-    " · 和小佳在一起 <strong>第 " + together + " 天</strong>" +
+  return '<div class="live-banner">和小佳在一起 <strong>第 ' + together + " 天</strong>" +
     (ann > 0 ? " · 距离一周年还有 <strong>" + ann + " 天</strong>" : "") +
     (special ? ' <span class="today-flag">' + escapeHtml(special) + "</span>" : "") +
     "</div>";
@@ -508,7 +504,7 @@ function renderFinalPage() {
   const copied = state.copied ? "已复制" : "复制全文";
   return '<div class="page"><div class="page-scroll"><div class="final-letter">' +
     "<h2>" + escapeHtml(letter.title) + "</h2>" +
-    photoStrip([loveData.finalPhoto], todayYMD().replace(/-/g, ".")) +
+    photoStrip([loveData.finalPhoto], "∞") +
     letter.paragraphs.map((t) => '<p class="f-para">' + escapeHtml(t) + "</p>").join("") +
     '<div class="f-sign">' + escapeHtml(letter.signature) + '<span class="sign-seal">♥</span></div>' +
     '<div class="final-actions">' +
@@ -624,25 +620,37 @@ function fullLetterText() {
 async function copyLetter() {
   const text = fullLetterText();
   try {
-    if (navigator.clipboard) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
     } else {
+      const oldSelect = document.body.style.userSelect;
+      const oldWebkitSelect = document.body.style.webkitUserSelect;
+      document.body.style.userSelect = "text";
+      document.body.style.webkitUserSelect = "text";
+
       const ta = document.createElement("textarea");
       ta.value = text;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
+      ta.style.pointerEvents = "none";
+      ta.setAttribute("readonly", "");
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand("copy");
+      ta.setSelectionRange(0, 999999);
+      const ok = document.execCommand("copy");
       ta.remove();
+
+      document.body.style.userSelect = oldSelect || "";
+      document.body.style.webkitUserSelect = oldWebkitSelect || "";
+      if (!ok) throw new Error("copy failed");
     }
     state.copied = true;
-        render();
-
+    render();
     celebrate("heart");
     window.setTimeout(() => { state.copied = false; render(); }, 1600);
   } catch {
     state.copied = false;
+    toast("复制失败，请手动长按文字选择复制");
   }
 }
 
